@@ -150,3 +150,18 @@ Return your confidence in this prediction as a single number between 0 and 1,
 representing how certain you are that your predicted receiver is correct.
 Only return the number, nothing else.
 """
+
+prompt_3 = """
+## Task: Map Name(s) to ID Number(s)
+
+You may receive one or more names separated by commas. For each name:
+- Match it as accurately as possible to the correct person in the list below, even if only part of the name is given.
+- Titles like "De heer", "Mevrouw", "Minister", or "Staatssecretaris" are part of the name and may help with matching.
+- If multiple names are given, return one numeric ID per name, in the same order.
+- Return all IDs as a comma-separated list, with no explanation or formatting.
+- If the name clearly refers to someone on the list, return that person's ID — even if it's not an exact string match.
+
+### Name to ID Mapping
+*insert names with IDs*
+
+"""
