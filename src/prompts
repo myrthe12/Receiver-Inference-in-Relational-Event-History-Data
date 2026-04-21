@@ -143,3 +143,10 @@ Zij krijgt nr. 272 (32140)., Sender: De heer Stultiens , message: Dank u wel.
 <receiver>
 De heer Stultiens
 </receiver>
+"""
+
+prompt_2 = """
+Return your confidence in this prediction as a single number between 0 and 1,
+representing how certain you are that your predicted receiver is correct.
+Only return the number, nothing else.
+"""
