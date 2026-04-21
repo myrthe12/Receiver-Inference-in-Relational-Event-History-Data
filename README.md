@@ -25,7 +25,8 @@ The implementation is applied to Dutch parliamentary debate transcripts.
 ## Repository Structure
 
 ```text
-├── prompts/                           # Few-shot prompt templates
+├── prompts/                           
+│   ├── few_shot_cascading_prompt.py   # Few-shot prompt
 ├── src/
 │   ├── inference.py                   # API calls for receiver prediction
 │   ├── turn_level_evaluation.py       # Turn-level evaluation metrics
