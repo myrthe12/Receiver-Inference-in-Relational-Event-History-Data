@@ -1,1 +1,172 @@
-sd
+# Imports
+%pip install -qU langchain-openai langchain
+from langchain_core.messages import HumanMessage, AIMessage
+import pydantic
+import openai
+from openai.types.chat import ChatCompletion
+import os
+import pandas as pd
+import regex as re
+from langchain_openai import ChatOpenAI
+#from langchain.schema import SystemMessage, HumanMessage
+import math
+from pydantic import BaseModel, Field
+import plotly.graph_objects as go
+import networkx as nx
+from collections import Counter
+import numpy as np
+from sklearn.calibration import calibration_curve
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_auc_score, average_precision_score, jaccard_score, precision_recall_curve, auc, roc_curve, roc_auc_score
+import seaborn as sns
+
+*insert prompts*
+
+# Set OpenAI API key
+import os
+api_key = os.environ["OPENAI_API_KEY"]
+
+# Define Pydantic model
+class Message(pydantic.BaseModel):
+    sender: str
+    message: str
+    conversation_history: str
+    receiver: str  # Hand annotated receiver
+
+class ReceiverOutput(BaseModel):
+    receiver: str = Field(description="The name of the identified receiver of the current message.")
+
+# --- Load dataset ---
+try:
+    df = pd.read_csv(
+        *insert data*
+    )
+    conversation_data = df.to_dict('records')
+    print(f"Successfully loaded {len(conversation_data)} records from the dataset.")
+except FileNotFoundError:
+    print("Error: The CSV file was not found at the specified path.")
+    conversation_data = []
+except Exception as e:
+    print(f"An error occurred while loading the CSV file: {e}")
+    conversation_data = []
+
+# --- Instantiate models ---
+llm_receiver = ChatOpenAI(model="gpt-4.1", logprobs=True)  # for receiver prediction + logprobs
+llm_confidence = ChatOpenAI(model="gpt-4.1")  # for confidence scoring
+
+results = []
+
+# --- Process data ---
+for i, item in enumerate(conversation_data):
+    try:
+        # --- Step 1a: Get raw response with logprobs ---
+        messages = [
+            SystemMessage(content=prompt_1),
+            HumanMessage(content=f"""<sender>{item.get('sender', '')}</sender>
+                                      <message>{item.get('message', '')}</message>
+                                      <history>{item.get('conversation_history', '')}</history>""")
+        ]
+        raw_msg = llm_receiver.invoke(messages)
+        raw_text = raw_msg.content.strip()  # predicted receiver
+        logprobs_content = raw_msg.response_metadata.get("logprobs", {}).get("content")
+        avg_logprob = (sum(token['logprob'] for token in logprobs_content) / len(logprobs_content)) if logprobs_content else None
+        avg_prob_percent = math.exp(avg_logprob)*100 if avg_logprob is not None else None
+
+        predicted_receiver = raw_text
+
+        # --- Step 2: Confidence scoring ---
+        messages_conf = [
+            SystemMessage(content=prompt_2),
+            HumanMessage(content=f"Sender: {item.get('sender', '')}\n"
+                                 f"Message: {item.get('message', '')}\n"
+                                 f"History: {item.get('conversation_history', '')}\n"
+                                 f"Predicted Receiver: {predicted_receiver}")
+        ]
+        msg_conf = llm_confidence.invoke(messages_conf)
+        try:
+            confidence_score = float(msg_conf.content.strip())
+        except ValueError:
+            confidence_score = None
+
+        # --- Store results ---
+        results.append({
+            "sender": item.get("sender", ""),
+            "message": item.get("message", ""),
+            "conversation_history": item.get("conversation_history", ""),
+            "actual_receiver": item.get("receiver", ""),
+            "predicted_receiver": predicted_receiver,
+            "confidence_score": confidence_score,
+            "logprobs_content": logprobs_content,
+            "avg_logprob": avg_logprob,
+            "avg_prob_percent": avg_prob_percent
+        })
+
+    except Exception as e:
+        print(f"Error processing item {i}: {e}")
+        results.append({
+            "sender": item.get("sender", ""),
+            "message": item.get("message", ""),
+            "conversation_history": item.get("conversation_history", ""),
+            "actual_receiver": item.get("receiver", ""),
+            "predicted_receiver": None,
+            "confidence_score": None,
+            "logprobs_content": None,
+            "avg_logprob": None,
+            "avg_prob_percent": None,
+            "error": str(e)
+        })
+        continue
+
+# --- Save results to DataFrame ---
+results_df = pd.DataFrame(results)
+display(results_df)
+
+# Highest value in the column
+max_value = results_df['avg_prob_percent'].max()
+
+# Lowest value in the column
+min_value = results_df['avg_prob_percent'].min()
+
+print("Max:", max_value)
+print("Min:", min_value)
+
+# Count how many values are between 0.8 and 1.0
+count = results_df[(results_df['confidence_score'] >= 0.8) & (results_df['confidence_score'] <= 1.0)].shape[0]
+count2 = results_df[(results_df['avg_prob_percent'] >= 80.00) & (results_df['avg_prob_percent'] <= 100.00)].shape[0]
+print(count)
+
+# Calculate percentage
+percentage = (count / len(results_df)) * 100
+percentage2 = (count2 / len(results_df)) * 100
+print(f"{percentage:.2f}%")
+print(f"{percentage2:.2f}%")
+
+
+# Initialize LLM
+llm = ChatOpenAI(model="gpt-4.1").bind(logprobs=True)
+
+# Create a new column with 'object' dtype to hold lists
+results_df['receiver_ids'] = None
+results_df['receiver_ids'] = results_df['receiver_ids'].astype('object')
+
+
+for idx, row in results_df.iterrows():
+    name = row['predicted_receiver']
+
+    # --- Step 1: Map name → ID ---
+    messages_1 = [
+        SystemMessage(content=prompt_3),
+        HumanMessage(content=str(name))
+    ]
+    msg_1 = llm.invoke(messages_1)
+    answer_1 = msg_1.content.strip()
+
+    # Extract all numeric IDs from the output
+    ids = re.findall(r"\d+", answer_1)
+    id_numbers = [int(x) for x in ids] if ids else []
+
+    # --- Store result as list of IDs ---
+    results_df.at[idx, 'receiver_ids'] = id_numbers
+    results_df.to_csv("results_df.csv", index=False)
+
+results_df
