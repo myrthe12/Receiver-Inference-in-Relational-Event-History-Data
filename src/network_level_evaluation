@@ -1,0 +1,250 @@
+interactions = []
+
+for index, row in df.iloc[1:].iterrows():
+    speaker = int(row["sender"])
+    receivers = str(row["Guessed Receiver (LLM)"]).split(",")
+    receivers = [r.strip() for r in receivers if r.strip().isdigit()]
+    interactions.extend((speaker, int(r)) for r in receivers)
+
+# === 2. Build directed graph with weighted edges ===
+G_pred = nx.DiGraph()
+G_pred.add_nodes_from(range(1, 20))  # 19 unique speaker IDs
+edge_weights = Counter(interactions)
+for (src, tgt), weight in edge_weights.items():
+    G_pred.add_edge(src, tgt, weight=weight)
+
+# === 3. Node positions using spring layout ===
+#pos = nx.spring_layout(G_pred, seed=42)
+
+# Increase k to spread nodes further apart
+pos = nx.spring_layout(G, seed=42, k=1.5, iterations=100)
+
+for node in G_pred.nodes():
+    G_pred.nodes[node]['pos'] = pos[node]
+
+# === 4. Edge coordinates ===
+edge_traces = []
+
+max_weight = max([d['weight'] for _, _, d in G_pred.edges(data=True)]) if G_pred.number_of_edges() > 0 else 1
+
+for u, v, data in G_pred.edges(data=True):
+    x0, y0 = G_pred.nodes[u]['pos']
+    x1, y1 = G_pred.nodes[v]['pos']
+    weight = data['weight']
+    width = 0.5 + (weight / max_weight) * 5  # Adjust the scaling factor as needed
+    edge_trace = go.Scatter(
+        x=[x0, x1, None],
+        y=[y0, y1, None],
+        line=dict(width=width, color='#888'),
+        hoverinfo='text',
+        mode='lines',
+        text=f'{u} → {v}<br>Weight: {weight}'
+    )
+    edge_traces.append(edge_trace)
+
+# === 5. Node coordinates and coloring by degree ===
+node_x = []
+node_y = []
+node_color = []
+node_text = []
+
+for node in G_pred.nodes():
+    x, y = G_pred.nodes[node]['pos']
+    node_x.append(x)
+    node_y.append(y)
+    in_deg = G_pred.in_degree(node)
+    out_deg = G_pred.out_degree(node)
+    node_color.append(in_deg + out_deg)
+    node_text.append(f"ID {node}<br>In: {in_deg} | Out: {out_deg}")
+
+node_trace = go.Scatter(
+    x=node_x, y=node_y,
+    mode='markers',
+    hoverinfo='text',
+    #text=[str(node) for node in G.nodes()],
+    #textposition="top center",
+    marker=dict(
+        showscale=True,
+        colorscale='YlGnBu',
+        reversescale=True,
+        color=node_color,
+        size=10,
+        colorbar=dict(
+            thickness=15,
+            title=dict(
+                text='Node Connections',
+                side='right'
+            ),
+            xanchor='left',
+        ),
+        line_width=2)
+)
+
+#node_trace.text = node_text  # Set hover text
+node_trace = go.Scatter(
+    x=node_x, y=node_y,
+    mode='markers+text',   # <--- markers + text
+    text=[str(node) for node in G_pred.nodes()],  # node IDs as labels
+    textposition="top center",                   # position above the marker
+    hoverinfo='text',
+    marker=dict(
+        showscale=True,     # keep color scale if you want
+        colorscale='YlGnBu',
+        reversescale=True,
+        color=node_color,
+        size=12,
+        line_width=2
+    )
+)
+
+
+# === 6. Your custom layout ===
+fig2 = go.Figure(data=edge_traces + [node_trace],
+             layout=go.Layout(
+                title=dict(
+                    text="<br>LLM network graph",
+                    font=dict(size=16)
+                ),
+                showlegend=False,
+                hovermode='closest',
+                margin=dict(b=20, l=5, r=5, t=40),
+                annotations=[dict(
+                    text='Predicted receivers',
+                    showarrow=False,
+                    xref="paper", yref="paper",
+                    x=0.005, y=-0.002)],
+                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
+             )
+fig2
+
+import pandas as pd
+import networkx as nx
+from collections import Counter
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+# --- 1. Prepare ground truth interactions ---
+interactions_gt = []
+for index, row in df.iloc[1:].iterrows():
+    speaker = int(row["sender"])
+    receivers = str(row["receiver"]).split(",")
+    receivers = [r.strip() for r in receivers if r.strip().isdigit()]
+    interactions_gt.extend((speaker, int(r)) for r in receivers)
+
+# --- 2. Prepare LLM predicted interactions ---
+interactions_pred = []
+for index, row in df.iloc[1:].iterrows():
+    speaker = int(row["sender"])
+    receivers = str(row["Guessed Receiver (LLM)"]).split(",")
+    receivers = [r.strip() for r in receivers if r.strip().isdigit()]
+    interactions_pred.extend((speaker, int(r)) for r in receivers)
+
+# --- 3. Build graphs ---
+G_gt = nx.DiGraph()
+G_gt.add_nodes_from(range(1, 20))
+edge_weights = Counter(interactions_gt)
+for (src, tgt), weight in edge_weights.items():
+    G_gt.add_edge(src, tgt, weight=weight)
+
+G_pred = nx.DiGraph()
+G_pred.add_nodes_from(range(1, 20))
+edge_weights = Counter(interactions_pred)
+for (src, tgt), weight in edge_weights.items():
+    G_pred.add_edge(src, tgt, weight=weight)
+
+# --- 4. Select subset of nodes ---
+fixed_nodes = [1,2,3,4,5,6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+G_gt_sub = G_gt.subgraph(fixed_nodes).copy()
+G_pred_sub = G_pred.subgraph(fixed_nodes).copy()
+
+# --- 5. Compute one layout and apply to both graphs ---
+#pos = nx.spring_layout(G_gt_sub, seed=42)
+
+# Increase k to spread nodes further apart
+pos = nx.spring_layout(G, seed=42, k=1.5, iterations=50)
+
+for node in fixed_nodes:
+    if node in G_gt_sub:
+        G_gt_sub.nodes[node]['pos'] = pos[node]
+    if node in G_pred_sub:
+        G_pred_sub.nodes[node]['pos'] = pos[node]
+
+# --- 6. Helper function to build traces ---
+def build_traces(G_sub, show_colorbar=False):
+    edge_traces = []
+    max_weight = max([d['weight'] for _, _, d in G_sub.edges(data=True)]) if G_sub.number_of_edges() > 0 else 1
+
+    for u,v,data in G_sub.edges(data=True):
+        x0,y0 = G_sub.nodes[u]['pos']
+        x1,y1 = G_sub.nodes[v]['pos']
+        weight = data['weight']
+        width = 0.5 + (weight / max_weight) * 5
+        edge_traces.append(go.Scatter(
+            x=[x0,x1,None],
+            y=[y0,y1,None],
+            line=dict(width=width,color='#888'),
+            mode='lines',
+            hoverinfo='text',
+            text=f'{u} → {v}<br>Weight: {weight}'
+        ))
+
+    node_x, node_y, node_color, node_text = [], [], [], []
+    for node in G_sub.nodes():
+        x,y = G_sub.nodes[node]['pos']
+        node_x.append(x)
+        node_y.append(y)
+        in_deg = G_sub.in_degree(node)
+        out_deg = G_sub.out_degree(node)
+        node_color.append(in_deg + out_deg)
+        node_text.append(f"ID {node}<br>In:{in_deg} Out:{out_deg}")
+
+    node_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode='markers',
+        text=[str(node) for node in G_sub.nodes()],
+        textposition='top center',
+        hoverinfo='text',
+        marker=dict(
+            showscale=show_colorbar,
+            colorscale='YlGnBu',
+            reversescale=True,
+            color=node_color,
+            size=12,
+            line_width=2,
+            colorbar=dict(
+                thickness=15,
+                title=dict(text='Node Connections')
+            ) if show_colorbar else None
+        )
+    )
+    #node_trace.text = node_text
+    return edge_traces + [node_trace]
+
+# --- 7. Build traces ---
+traces_gt = build_traces(G_gt_sub, show_colorbar=True)
+traces_pred = build_traces(G_pred_sub, show_colorbar=False)
+
+# --- 8. Combine in subplots ---
+fig = make_subplots(rows=1, cols=2, subplot_titles=("Ground truth network","LLM prediction network"))
+
+for trace in traces_gt:
+    fig.add_trace(trace, row=1, col=1)
+for trace in traces_pred:
+    fig.add_trace(trace, row=1, col=2)
+
+# --- 9. Fix axes to align nodes ---
+fig.update_xaxes(showticklabels=False, row=1, col=1)
+fig.update_xaxes(showticklabels=False, row=1, col=2)
+fig.update_yaxes(showticklabels=False, row=1, col=1)
+fig.update_yaxes(showticklabels=False, row=1, col=2)
+
+fig.update_layout(
+    showlegend=False,
+    hovermode='closest',
+    plot_bgcolor='white',
+    paper_bgcolor='white',
+    margin=dict(b=20,l=20,r=20,t=40)
+)
+
+fig.show()
