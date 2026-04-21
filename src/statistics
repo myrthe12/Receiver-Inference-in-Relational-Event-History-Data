@@ -1,0 +1,396 @@
+%pip install -U kaleido
+
+
+#fig.write_image("grafieken.png", scale=3)
+fig.write_image("grafieken.svg")   # scalable, never blurry
+fig.write_image("grafieken.pdf")   # best for PowerPoint on Mac
+
+true_edges = set(G.edges())
+pred_edges = set(G_pred.edges())
+
+participants = set(range(1, 20)) # Define the participants set
+all_possible_edges = set((a, b) for a in participants for b in participants if a != b)
+
+tp = len(true_edges & pred_edges)
+fp = len(pred_edges - true_edges)
+fn = len(true_edges - pred_edges)
+tn = len(all_possible_edges - (true_edges | pred_edges))
+
+precision = tp / (tp + fp) if tp + fp > 0 else 0
+recall = tp / (tp + fn) if tp + fn > 0 else 0
+f1 = 2 * precision * recall / (precision + recall) if precision + recall > 0 else 0
+accuracy = (tp + tn) / len(all_possible_edges) if len(all_possible_edges) > 0 else 0
+
+print(f"Precision: {precision:.3f}")
+print(f"Recall: {recall:.3f}")
+print(f"F1 Score: {f1:.3f}")
+print(f"Accuracy: {accuracy:.3f}")
+
+print("Confusion Matrix:")
+print(f"TP: {tp} | FP: {fp}")
+print(f"FN: {fn} | TN: {tn}")
+
+print(tp)
+
+# Calculate Jaccard similarity per message
+jaccard_per_message = tp / (tp + fp + fn)
+
+# Average Jaccard similarity over all messages
+overall_jaccard = np.mean(jaccard_per_message)
+
+print(f"Average Jaccard similarity: {overall_jaccard:.3f}")
+
+tp = fp = fn = tn = 0
+all_possible_pairs = [(a, b) for a in range(1, 20) for b in range(1, 20) if a != b]  # 262 x 19 =  4978 possible edges
+
+for idx, row in df.iterrows():
+    sender = int(row["sender"])
+
+    # Ground truth receivers
+    true_receivers = str(row["receiver"]).split(",")
+    true_receivers = set(int(r.strip()) for r in true_receivers if r.strip().isdigit())
+
+    # Predicted receivers
+    pred_receivers = str(row["Guessed Receiver (LLM)"]).split(",")
+    pred_receivers = set(int(r.strip()) for r in pred_receivers if r.strip().isdigit())
+
+    # Set of all possible receivers except the sender (1-20 without self)
+    possible_receivers = set(range(1, 20)) - {sender}
+
+    # True Positives
+    tp += len(pred_receivers & true_receivers)
+
+    # False Positives
+    fp += len(pred_receivers - true_receivers)
+
+    # False Negatives
+    fn += len(true_receivers - pred_receivers)
+
+    # True Negatives = receivers that are not in true or predicted sets
+    tn += len(possible_receivers - (true_receivers | pred_receivers))
+
+# Final metrics
+print(f"TP: {tp}, FP: {fp}, FN: {fn}, TN: {tn}")
+
+# Compute metrics
+precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+accuracy = (tp + tn) / (tp + fp + fn + tn) if (tp + fp + fn + tn) > 0 else 0
+
+print(f"Precision: {precision:.3f}")
+print(f"Recall: {recall:.3f}")
+print(f"F1 Score: {f1:.3f}")
+print(f"Accuracy: {accuracy:.3f}")
+
+print(tp)
+
+# Calculate Jaccard similarity per message
+jaccard_per_message2 = tp / (tp + fp + fn)
+
+# Average Jaccard similarity over all messages
+overall_jaccard2 = np.mean(jaccard_per_message2)
+
+print(f"Average Jaccard similarity: {overall_jaccard2:.3f}")
+
+debug_data = []
+
+for idx, row in df.iterrows():
+    sender = int(row["sender"])
+
+    # Ground truth receivers
+    true_receivers_raw = str(row["receiver"]).split(",")
+    true_receivers = set(int(r.strip()) for r in true_receivers_raw if r.strip().isdigit())
+
+    # Predicted receivers
+    pred_receivers_raw = str(row["Guessed Receiver (LLM)"]).split(",")
+    pred_receivers = set(int(r.strip()) for r in pred_receivers_raw if r.strip().isdigit())
+
+    # Calculate breakdown
+    tp_set = pred_receivers & true_receivers
+    fp_set = pred_receivers - true_receivers
+    fn_set = true_receivers - pred_receivers
+
+    debug_data.append({
+        "Sender": sender,
+        "True Receivers": sorted(true_receivers),
+        "Predicted Receivers": sorted(pred_receivers),
+        "TP": sorted(tp_set),
+        "FP": sorted(fp_set),
+        "FN": sorted(fn_set)
+    })
+
+debug_df = pd.DataFrame(debug_data)
+
+# Optionally, save to CSV for review
+debug_df.to_csv("debug_df.csv", index=False)
+
+# Show the first few rows
+debug_df
+
+strict_correct_rows = 0
+partial_correct_rows = 0
+
+for idx, row in df.iterrows():
+    # Parse true receivers
+    true_receivers = str(row["receiver"]).split(",")
+    true_receivers = set(int(r.strip()) for r in true_receivers if r.strip().isdigit())
+
+    # Parse predicted receivers
+    pred_receivers = str(row["Guessed Receiver (LLM)"]).split(",")
+    pred_receivers = set(int(r.strip()) for r in pred_receivers if r.strip().isdigit())
+
+    # Partial match: any overlap
+    if true_receivers & pred_receivers:
+        partial_correct_rows += 1
+
+    # Strict match: exact sets
+    if true_receivers == pred_receivers:
+        strict_correct_rows += 1
+
+total_rows = len(df)
+partial_accuracy = partial_correct_rows / total_rows if total_rows > 0 else 0
+strict_accuracy = strict_correct_rows / total_rows if total_rows > 0 else 0
+
+print(f"Partial accuracy (at least one match): {partial_accuracy:.3f} ({partial_correct_rows}/{total_rows})")
+print(f"Strict accuracy (exact match):        {strict_accuracy:.3f} ({strict_correct_rows}/{total_rows})")
+
+# Check if the list in the 'TP' column is not empty
+debug_df['correct'] = (debug_df['TP'].apply(len) > 0).astype(int)
+debug_df = debug_df.merge(results_df[['avg_logprob', 'confidence_score']], left_index=True, right_index=True, how='left')
+debug_df
+
+# 1. Convert log-probabilities to probabilities
+debug_df['avg_prob'] = np.exp(debug_df['avg_logprob'])
+debug_df['avg_prob'] = np.clip(debug_df['avg_prob'], 0.0, 1.0)  # Geometric mean probability
+
+# 2. Extract relevant columns
+y_true = debug_df['correct']
+y_prob_log = debug_df['avg_prob']
+y_prob_conf = debug_df['confidence_score']
+
+# 3. Compute calibration data
+frac_pos_log, mean_prob_log = calibration_curve(y_true, y_prob_log, n_bins=10)
+frac_pos_conf, mean_prob_conf = calibration_curve(y_true, y_prob_conf, n_bins=10)
+
+# 4. Plot both calibration curves
+plt.figure(figsize=(8, 6))
+
+# Log-probability-based calibration
+plt.plot(mean_prob_log, frac_pos_log, 's-', label='Mean per-token probability')
+
+# Confidence-based calibration
+plt.plot(mean_prob_conf, frac_pos_conf, 'o-', label='Model confidence score')
+
+# Perfect calibration line
+plt.plot([0, 1], [0, 1], 'k--', label='Perfect Calibration')
+
+# Labels and title
+plt.xlabel('Model confidence / predicted probability')
+plt.ylabel('Observed frequency of positives')
+#plt.title('Calibration Curve Comparison')
+plt.legend(loc='best')
+plt.grid(True)
+plt.show()
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def plot_calibration_2x2(debug_df, n_bins=10, x_label_dict=None):
+    """
+    Plots 4 calibration plots in a 2x2 grid:
+    Top: counts (left: avg_prob, right: confidence_score)
+    Bottom: accuracy (left: avg_prob, right: confidence_score)
+    """
+    prob_cols = ['avg_prob', 'confidence_score']
+    bin_edges = np.linspace(0, 1, n_bins + 1)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+    # Colors
+    color_correct = 'tab:blue'
+    color_wrong = 'tab:red'
+    color_acc = 'tab:blue'
+
+    # Default x-axis labels
+    if x_label_dict is None:
+        x_label_dict = {'avg_prob': 'Mean per-token probability', 'confidence_score': 'Model confidence'}
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    axes = axes.flatten()  # easier indexing
+
+    for i, prob_col in enumerate(prob_cols):
+        # Assign bins
+        bin_indices = np.digitize(debug_df[prob_col], bin_edges) - 1
+        bin_indices = np.clip(bin_indices, 0, n_bins - 1)
+
+        counts_correct = np.zeros(n_bins)
+        counts_wrong = np.zeros(n_bins)
+        counts_total = np.zeros(n_bins)
+        accuracy_per_bin = np.zeros(n_bins)
+
+        for j in range(n_bins):
+            mask = bin_indices == j
+            counts_total[j] = mask.sum()
+            counts_correct[j] = debug_df.loc[mask, 'correct'].sum()
+            counts_wrong[j] = counts_total[j] - counts_correct[j]
+            accuracy_per_bin[j] = counts_correct[j] / max(counts_total[j], 1)
+
+        # --- Counts plot ---
+        axes[i].bar(bin_centers, counts_correct, width=0.08, alpha=0.9, color=color_correct, label='Correct')
+        axes[i].bar(bin_centers, counts_wrong, width=0.08, bottom=counts_correct, alpha=0.9, color=color_wrong, label='Wrong')
+        axes[i].set_xlabel(x_label_dict.get(prob_col, prob_col))
+        axes[i].set_ylabel('Count')
+        axes[i].set_title(f'Prediction counts ({prob_col})')
+        axes[i].legend()
+        axes[i].grid(True, axis='y')
+
+        # --- Accuracy plot ---
+        axes[i+2].bar(bin_centers, accuracy_per_bin, width=0.08, alpha=0.9, color=color_acc, label='Accuracy')
+        axes[i+2].plot([0, 1], [0, 1], 'k--', label='Perfect calibration')
+        axes[i+2].set_xlabel(x_label_dict.get(prob_col, prob_col))
+        axes[i+2].set_ylabel('Accuracy within bin')
+        axes[i+2].set_title(f'Calibration: Accuracy ({prob_col})')
+        axes[i+2].legend()
+        axes[i+2].grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+
+    # Usage
+plot_calibration_separate(debug_df, n_bins=10)
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def plot_calibration_2x2_clean(debug_df, n_bins=10, x_label_dict=None):
+    """
+    2x2 grid: top row = counts, bottom row = accuracy
+    Left column = avg_prob, right column = confidence_score
+    Fixed bins from 0 to 1 for cleaner, uniform plots.
+    """
+    prob_cols = ['avg_prob', 'confidence_score']
+
+    color_correct = 'tab:blue'
+    color_wrong = 'tab:red'
+    color_acc = 'tab:blue'
+
+    if x_label_dict is None:
+        x_label_dict = {'avg_prob': 'Mean per-token probability', 'confidence_score': 'Model confidence'}
+
+    bin_edges = np.linspace(0, 1, n_bins + 1)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    bar_width = 0.9 * (bin_edges[1] - bin_edges[0])  # slight gap for clarity
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+    for col_idx, prob_col in enumerate(prob_cols):
+        # Assign bins
+        bin_indices = np.digitize(debug_df[prob_col], bin_edges) - 1
+        bin_indices = np.clip(bin_indices, 0, n_bins - 1)
+
+        counts_correct = np.zeros(n_bins)
+        counts_wrong = np.zeros(n_bins)
+        counts_total = np.zeros(n_bins)
+        accuracy_per_bin = np.zeros(n_bins)
+
+        for i in range(n_bins):
+            mask = bin_indices == i
+            counts_total[i] = mask.sum()
+            counts_correct[i] = debug_df.loc[mask, 'correct'].sum()
+            counts_wrong[i] = counts_total[i] - counts_correct[i]
+            accuracy_per_bin[i] = counts_correct[i] / max(counts_total[i], 1)
+
+        # --- Top row: counts ---
+        ax_counts = axes[0, col_idx]
+        ax_counts.bar(bin_centers, counts_correct, width=bar_width, color=color_correct, label='Correct output', alpha=0.9)
+        ax_counts.bar(bin_centers, counts_wrong, width=bar_width, bottom=counts_correct, color=color_wrong, label='Wrong output', alpha=0.9)
+        ax_counts.set_xlabel(x_label_dict.get(prob_col, prob_col))
+        ax_counts.set_ylabel('Count')
+        #ax_counts.set_title(f'Prediction counts ({prob_col})')
+        ax_counts.legend()
+        ax_counts.grid(True, axis='y')
+
+        # --- Bottom row: accuracy ---
+        ax_acc = axes[1, col_idx]
+        ax_acc.bar(bin_centers, accuracy_per_bin, width=bar_width, color=color_acc, label='Accuracy', alpha=0.9)
+        ax_acc.plot([0, 1], [0, 1], 'k--', label='Perfect calibration')
+        ax_acc.set_xlabel(x_label_dict.get(prob_col, prob_col))
+        ax_acc.set_ylabel('Accuracy within bin')
+        #ax_acc.set_title(f'Calibration: Accuracy ({prob_col})')
+        ax_acc.legend()
+        ax_acc.grid(True)
+
+x_labels = {
+    'avg_prob': 'Mean per-token probability',
+    'confidence_score': 'Model confidence'
+}
+
+
+
+
+plot_calibration_2x2_clean(debug_df, n_bins=20, x_label_dict=x_labels)
+
+import matplotlib.pyplot as plt
+plt.savefig("grafieken.png", dpi=300, bbox_inches='tight')
+
+
+# Calculate percentage of values above 0.8 for both columns
+threshold = 0.8
+
+pct_above_avg_prob = (debug_df['avg_prob'] > threshold).mean() * 100
+pct_above_conf_score = (debug_df['confidence_score'] > threshold).mean() * 100
+
+print(f"Percentage of avg_prob > 0.8: {pct_above_avg_prob:.2f}%")
+print(f"Percentage of confidence_score > 0.8: {pct_above_conf_score:.2f}%")
+
+# Compute Expected Calibration Error (ECE), lower indicates better calibaration
+def compute_ece(y_true, y_prob, n_bins=10):
+    bins = np.linspace(0.0, 1.0, n_bins + 1)
+    bin_indices = np.digitize(y_prob, bins) - 1  # Bin assignment for each sample
+
+    ece = 0.0
+    total_samples = len(y_prob)
+
+    for i in range(n_bins):
+        bin_mask = bin_indices == i
+        bin_size = np.sum(bin_mask)
+
+        if bin_size > 0:
+            bin_confidence = np.mean(y_prob[bin_mask])
+            bin_accuracy = np.mean(y_true[bin_mask])
+            ece += (bin_size / total_samples) * np.abs(bin_accuracy - bin_confidence)
+
+    return ece
+
+# Extract targets and predicted probabilities
+y_true = debug_df['correct'].values
+y_prob_log = debug_df['avg_prob'].values
+y_prob_conf = debug_df['confidence_score'].values
+
+# Compute ECE for both
+ece_log = compute_ece(y_true, y_prob_log, n_bins=10)
+ece_conf = compute_ece(y_true, y_prob_conf, n_bins=10)
+
+print(f"Expected Calibration Error (ECE) — avg_prob (logprob-based): {ece_log:.4f}")
+print(f"Expected Calibration Error (ECE) — confidence_score:    {ece_conf:.4f}")
+
+y_true = debug_df['correct']
+y_score = debug_df['avg_logprob']
+
+# Replace NaN values in y_score with 0.5
+#y_score = y_score.fillna(0.5)
+
+auroc = roc_auc_score(y_true, y_score)
+aupr = average_precision_score(y_true, y_score)
+
+print(f"AUROC: {auroc:.3f}")
+print(f"AUPR: {aupr:.3f}")
+
+# Calculate Jaccard similarity per message
+jaccard_per_message = tp / (tp + fp + fn)
+
+# Average Jaccard similarity over all messages
+overall_jaccard = np.mean(jaccard_per_message)
+
+print(f"Average Jaccard similarity: {overall_jaccard:.3f}")
