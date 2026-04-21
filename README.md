@@ -30,6 +30,6 @@ The implementation is applied to Dutch parliamentary debate transcripts.
 │   ├── inference.py                   # API calls for receiver prediction
 │   ├── turn_level_evaluation.py       # Turn-level evaluation metrics
 │   ├── network_level_evaluation.py    # Network construction and analysis
-│   ├── statstics_and_model_confidence.py                  # Self-assessed confidence and logprob analysis 
+│   ├── statistics.py                  # Calculated statistics, self-assessed confidence scores and logprob analysis 
 │   ├── rem_analysis.py                # Relational event analysis
 └── README.md
