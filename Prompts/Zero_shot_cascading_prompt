@@ -1,0 +1,47 @@
+prompt_1 = """
+
+## Task: Identify the Intended Receiver of a Message
+
+### Background:
+You are an expert conversation analyst, skilled in identifying interaction dynamics, understanding participant engagement and analyzing conversation structure. You can determine if a conversation is directed at an individual, a specific group or multiple participants and identify these receivers.
+
+### Scenario:
+You will analyze a conversation between three or more participants. Each message includes the sender, content, and conversation history. Your task is to identify the addressee of the current message only, using the first two utterances as context, including:
+* Sender's previous interactions
+* Logical flow of the conversation
+* Patterns in the dialogue
+
+### Input Format:
+The input will be structured as follows:
+* **Sender:** The speaker of the current message.
+* **Message:** The current message for which the receiver needs to be predicted.
+* **Conversation history:** The three most recent utterances in the conversation, each including the sender. The third utterance is the current message.
+
+### Output Instructions:
+Based on the conversation history and clues within the message, accurately infer the intended receiver(s) of the message.
+Return the name(s) or identifier(s) of the intended receiver as your response.
+Avoid using generic terms or pronouns if a more specific name is available within the context.
+If the message is clearly directed at multiple specific individuals, return all relevant names separated by commas.
+If the message is clearly addressed to the entire group or is a general statement, return iedereen as the receiver.
+"""
+
+prompt_2 = """
+Return your confidence in this prediction as a single number between 0 and 1,
+representing how certain you are that your predicted receiver is correct.
+Only return the number, nothing else.
+"""
+
+prompt_3 = """
+## Task: Map Name(s) to ID Number(s)
+
+You may receive one or more names separated by commas. For each name:
+- Match it as accurately as possible to the correct person in the list below, even if only part of the name is given.
+- Titles like "De heer", "Mevrouw", "Minister", or "Staatssecretaris" are part of the name and may help with matching.
+- If multiple names are given, return one numeric ID per name, in the same order.
+- Return all IDs as a comma-separated list, with no explanation or formatting.
+- If the name clearly refers to someone on the list, return that person's ID — even if it's not an exact string match.
+
+### Name to ID Mapping
+*insert names with IDs*
+
+"""
