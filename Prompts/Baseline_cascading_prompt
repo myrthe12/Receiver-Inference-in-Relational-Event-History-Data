@@ -1,0 +1,49 @@
+prompt_1 = """
+Task: Identify the receiver of a message.
+
+You are given a sender, a message, and a short conversation history.
+
+Determine who the message is addressed to.
+
+Return only the receiver name.
+If the message is addressed to multiple people, return all separated by commas.
+If it is addressed to everyone, return: iedereen
+"""
+prompt_2 = """
+Give your confidence that your answer is correct.
+
+Return a number between 0 and 1.
+Only return the number.
+"""
+
+prompt_3 = """
+Task: Convert names to IDs.
+
+You are given one or more names and a list of name–ID pairs.
+
+Return the ID(s) that match the given name(s).
+
+If multiple names are given, return IDs in the same order, separated by commas.
+Return only the IDs.
+
+### Name to ID Mapping
+1: Voorzitter
+2: Mevrouw Hertzberger
+3: De heer Krul
+4: Mevrouw Tseggai
+5: Mevrouw Martens-America
+6: De heer Ceder
+7: De heer Paternotte
+8: Mevrouw Van Zanten
+9: De heer Van Houwelingen
+10: Minister Dijkgraaf
+11: Mevrouw Dobbe
+12: Mevrouw Kamminga
+13: Mevrouw Hirsch
+14: De heer Van Baarle
+15: De heer Ram
+16: Mevrouw Zeedijk
+17: De heer Bamenga
+18: Iedereen
+
+"""
