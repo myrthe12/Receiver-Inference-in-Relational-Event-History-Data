@@ -26,7 +26,6 @@ import seaborn as sns
 import os
 api_key = os.environ["OPENAI_API_KEY"]
 
-# Define Pydantic model
 class Message(pydantic.BaseModel):
     sender: str
     message: str
@@ -39,7 +38,7 @@ class ReceiverOutput(BaseModel):
 # --- Load dataset ---
 try:
     df = pd.read_csv(
-        *insert data*
+        "/content/Input_LLM_debat_1 - Blad1.csv"
     )
     conversation_data = df.to_dict('records')
     print(f"Successfully loaded {len(conversation_data)} records from the dataset.")
@@ -56,9 +55,14 @@ llm_confidence = ChatOpenAI(model="gpt-4.1")  # for confidence scoring
 
 results = []
 
-# --- Process data ---
-for i, item in enumerate(conversation_data):
-    try:
+n_runs = 3
+all_results = []
+
+for run in range(n_runs):
+    run_results = []
+
+    for i, item in enumerate(conversation_data):
+      try:
         # --- Step 1a: Get raw response with logprobs ---
         messages = [
             SystemMessage(content=prompt_1),
@@ -89,7 +93,7 @@ for i, item in enumerate(conversation_data):
             confidence_score = None
 
         # --- Store results ---
-        results.append({
+        run_results.append({
             "sender": item.get("sender", ""),
             "message": item.get("message", ""),
             "conversation_history": item.get("conversation_history", ""),
@@ -101,9 +105,9 @@ for i, item in enumerate(conversation_data):
             "avg_prob_percent": avg_prob_percent
         })
 
-    except Exception as e:
+      except Exception as e:
         print(f"Error processing item {i}: {e}")
-        results.append({
+        run_results.append({
             "sender": item.get("sender", ""),
             "message": item.get("message", ""),
             "conversation_history": item.get("conversation_history", ""),
@@ -117,30 +121,12 @@ for i, item in enumerate(conversation_data):
         })
         continue
 
+    all_results.extend(run_results)
+    print(f"Run {run + 1} completed.")
+
 # --- Save results to DataFrame ---
-results_df = pd.DataFrame(results)
+results_df = pd.DataFrame(all_results)
 display(results_df)
-
-# Highest value in the column
-max_value = results_df['avg_prob_percent'].max()
-
-# Lowest value in the column
-min_value = results_df['avg_prob_percent'].min()
-
-print("Max:", max_value)
-print("Min:", min_value)
-
-# Count how many values are between 0.8 and 1.0
-count = results_df[(results_df['confidence_score'] >= 0.8) & (results_df['confidence_score'] <= 1.0)].shape[0]
-count2 = results_df[(results_df['avg_prob_percent'] >= 80.00) & (results_df['avg_prob_percent'] <= 100.00)].shape[0]
-print(count)
-
-# Calculate percentage
-percentage = (count / len(results_df)) * 100
-percentage2 = (count2 / len(results_df)) * 100
-print(f"{percentage:.2f}%")
-print(f"{percentage2:.2f}%")
-
 
 # Initialize LLM
 llm = ChatOpenAI(model="gpt-4.1").bind(logprobs=True)
