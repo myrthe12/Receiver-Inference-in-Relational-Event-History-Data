@@ -387,10 +387,35 @@ aupr = average_precision_score(y_true, y_score)
 print(f"AUROC: {auroc:.3f}")
 print(f"AUPR: {aupr:.3f}")
 
-# Calculate Jaccard similarity per message
-jaccard_per_message = tp / (tp + fp + fn)
+#Assess robustness
+from collections import Counter
 
-# Average Jaccard similarity over all messages
-overall_jaccard = np.mean(jaccard_per_message)
+aggregated_results = []
 
-print(f"Average Jaccard similarity: {overall_jaccard:.3f}")
+N = len(conversation_data)
+
+for i in range(N):
+    preds = [all_results[run * N + i]["predicted_receiver"] for run in range(n_runs)]
+    confs = [all_results[run * N + i]["confidence_score"] for run in range(n_runs) if all_results[run * N + i]["confidence_score"] is not None]
+    logprobs = [all_results[run * N + i]["avg_logprob"] for run in range(n_runs) if all_results[run * N + i]["avg_logprob"] is not None]
+
+    # --- Majority vote for receiver ---
+    most_common = Counter(preds).most_common(1)[0][0]
+
+    # --- Consistency check ---
+    consistent = len(set(preds)) == 1
+
+    # --- Averages ---
+    avg_conf = sum(confs)/len(confs) if confs else None
+    avg_logprob = sum(logprobs)/len(logprobs) if logprobs else None
+
+    aggregated_results.append({
+        "row_id": i,
+        "final_receiver": most_common,
+        "consistent_across_runs": consistent,
+        "avg_confidence": avg_conf,
+        "avg_logprob": avg_logprob
+    })
+
+consistency_rate = sum(r["consistent_across_runs"] for r in aggregated_results) / len(aggregated_results)
+print(f"Consistency rate: {consistency_rate:.2f}")
