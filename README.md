@@ -26,7 +26,9 @@ The implementation is applied to Dutch parliamentary debate transcripts.
 
 ```text
 ├── prompts/                           
-│   ├── few_shot_cascading_prompt.py   # Few-shot prompt
+│   ├── Baseline_prompt.py   
+│   ├── Zero_shot_prompt.py   
+│   ├── Few_shot_prompt.py    
 ├── src/
 │   ├── inference.py                   # API calls for receiver prediction
 │   ├── turn_level_evaluation.py       # Turn-level evaluation metrics
