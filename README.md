@@ -25,14 +25,14 @@ The implementation is applied to Dutch parliamentary debate transcripts.
 ## Repository Structure
 
 ```text
-├── prompts/                           
+├── Prompts/                           
 │   ├── Baseline_prompt.py   
 │   ├── Zero_shot_prompt.py   
 │   ├── Few_shot_prompt.py    
-├── src/
-│   ├── inference.py                   # API calls for receiver prediction
-│   ├── turn_level_evaluation.py       # Turn-level evaluation metrics
-│   ├── network_level_evaluation.py    # Network construction and analysis
-│   ├── statistics.py                  # Calculated statistics, self-assessed confidence scores and logprob analysis 
-│   ├── rem_analysis.py                # Relational event analysis
+├── Code/
+│   ├── Inference.py                   # API calls for receiver prediction
+│   ├── Turn_level_evaluation.py       # Turn-level evaluation metrics
+│   ├── Network_level_evaluation.py    # Network construction and analysis
+│   ├── Statistics.py                  # Calculated statistics, self-assessed confidence scores and logprob analysis 
+│   ├── Rem_analysis.py                # Relational event analysis
 └── README.md
